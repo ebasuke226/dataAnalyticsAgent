@@ -4,6 +4,25 @@ import json
 import os
 import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
+from typing import TypedDict
+from langgraph.graph import StateGraph, END
+
+# --- LangGraph State ---
+class AgentState(TypedDict):
+    user_query: str
+
+# --- LangGraph Nodes ---
+def node_passthrough(state: AgentState):
+    """A node that passes the state through without modification."""
+    print("Executing node: passthrough")
+    return state
+
+# --- LangGraph Definition ---
+workflow = StateGraph(AgentState)
+workflow.add_node("passthrough", node_passthrough)
+workflow.set_entry_point("passthrough")
+workflow.add_edge("passthrough", END)
+app_graph = workflow.compile()
 
 # --- FastAPI Models ---
 class AnalyzeRequest(BaseModel):
@@ -57,6 +76,19 @@ async def test_llm():
     except Exception as e:
         print(f"An error occurred in /test_llm: {e}") # エラーをコンソールに出力
         raise HTTPException(status_code=500, detail=f"LLM test failed: {e}")
+
+@app.get("/graph_test")
+async def graph_test():
+    """Endpoint to test the LangGraph workflow."""
+    try:
+        print("Testing LangGraph workflow...")
+        initial_state = {"user_query": "foo"}
+        result = app_graph.invoke(initial_state)
+        print(f"LangGraph result: {result}")
+        return result
+    except Exception as e:
+        print(f"An error occurred in /graph_test: {e}")
+        raise HTTPException(status_code=500, detail=f"LangGraph test failed: {e}")
 
 @app.get("/catalog")
 async def get_catalog():

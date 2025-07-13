@@ -67,3 +67,32 @@ if st.button("LLM 疎通実行"):
         st.error("❌ バックエンドから無効なJSON応答を受け取りました。")
     except Exception as e:
         st.error(f"❌ 予期せぬエラーが発生しました: {e}")
+st.markdown("--- ")
+
+# LangGraph 疎通確認セクション
+st.subheader("3. LangGraph 疎通確認")
+if st.button("LangGraph 疎通実行"):
+    st.info("LangGraph にリクエストを送信中...")
+    try:
+        # LangGraph テストエンドポイントを叩く
+        response = requests.get("http://api:8000/graph_test")
+        response.raise_for_status() # HTTP エラーがあれば例外を発生
+
+        graph_test_response = response.json()
+        
+        st.subheader("LangGraph からの応答")
+        st.json(graph_test_response)
+
+        if graph_test_response.get("user_query") == "foo":
+            st.success(f"✅ LangGraph 疎通確認成功！")
+        else:
+            st.warning("⚠️ LangGraph からの応答が期待したものではありませんでした。")
+
+    except requests.exceptions.ConnectionError as e:
+        st.error(f"❌ バックエンドへの接続に失敗しました。FastAPI サービスが起動しているか確認してください: {e}")
+    except requests.exceptions.HTTPError as e:
+        st.error(f"❌ HTTP エラーが発生しました: {e}")
+    except json.JSONDecodeError:
+        st.error("❌ バックエンドから無効なJSON応答を受け取りました。")
+    except Exception as e:
+        st.error(f"❌ 予期せぬエラーが発生しました: {e}")
