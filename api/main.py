@@ -5,11 +5,31 @@ import os
 from langchain_openai import ChatOpenAI
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
+import pandas as pd
+import sqlite3
 
 # --- LangGraph State ---
 class AgentState(TypedDict):
     user_query: str
     sql: str
+    df: pd.DataFrame
+
+# --- Dummy DB Function ---
+def fetch_data(sql: str) -> pd.DataFrame:
+    """Executes the SQL query on the SQLite DB and returns a DataFrame."""
+    print(f"Executing SQL: {sql}")
+    db_path = "data/odoo_test_data.db"
+    try:
+        with sqlite3.connect(db_path) as con:
+            df = pd.read_sql_query(sql, con)
+        return df
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        # エラーが発生した場合は空のDataFrameを返すか、例外を再発生させる
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return pd.DataFrame()
 
 # --- LangGraph Nodes ---
 def node_generate_sql(state: AgentState):
@@ -22,7 +42,6 @@ def node_generate_sql(state: AgentState):
         with open("data/odoo_schema.json", "r") as f:
             schema = json.load(f)
     except FileNotFoundError:
-        # ファイルが見つからない場合は、スキーマ情報なしで続行（またはエラー処理）
         schema = {}
         print("Warning: schema file not found at data/odoo_schema.json")
 
@@ -43,7 +62,6 @@ SQLクエリのみを返し、他の説明やテキストは一切含めない�
 """
     response = llm.invoke(prompt)
     raw_sql = response.content
-    # 先頭の ```sql とそれに続く改行を削除し、末尾の ``` を削除
     cleaned_sql = raw_sql.strip().removeprefix("```sql").removesuffix("```").strip()
     
     print(f"Generated SQL: {cleaned_sql}")
@@ -51,11 +69,21 @@ SQLクエリのみを返し、他の説明やテキストは一切含めない�
     state["sql"] = cleaned_sql
     return state
 
+def node_execute_sql(state: AgentState) -> AgentState:
+    """Executes the SQL query and stores the result in the state."""
+    print("Executing node: execute_sql")
+    sql_query = state["sql"]
+    df = fetch_data(sql_query)
+    state["df"] = df
+    return state
+
 # --- LangGraph Definition ---
 workflow = StateGraph(AgentState)
 workflow.add_node("generate_sql", node_generate_sql)
+workflow.add_node("execute_sql", node_execute_sql)
 workflow.set_entry_point("generate_sql")
-workflow.add_edge("generate_sql", END)
+workflow.add_edge("generate_sql", "execute_sql")
+workflow.add_edge("execute_sql", END)
 app_graph = workflow.compile()
 
 # --- FastAPI Models ---
@@ -79,55 +107,46 @@ def get_llm():
     if not openai_api_key:
         raise ValueError("GPT_API_KEY environment variable not set.")
     
-    # GPT-4o-miniモデルを使用
     return ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=openai_api_key)
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
     print(f"Received query: {request.query}")
     
-    # LangGraphを呼び出し
-    initial_state = {"user_query": request.query, "sql": ""}
+    initial_state = {"user_query": request.query, "sql": "", "df": pd.DataFrame()}
     final_state = app_graph.invoke(initial_state)
     
-    # 生成されたSQLを返す（一時的な実装）
+    df = final_state.get("df")
+    df_json = df.to_json(orient="split", index=False) if df is not None and not df.empty else "{}"
+
     return AnalyzeResponse(
-        data_json=json.dumps({"sql": final_state.get("sql")}),
+        data_json=df_json,
         graph_code="",
-        insights="SQL Generated"
+        insights="SQL Executed"
     )
 
 @app.get("/test_llm", response_model=LLMTestResponse)
 async def test_llm():
     try:
-        print("Attempting to get LLM...")
         llm = get_llm()
-        print("Successfully got LLM.")
-        
         prompt = "Hello"
-        print(f"Invoking LLM with prompt: {prompt}")
         response = llm.invoke(prompt)
-        print(f"LLM Test Response: {response.content}")
-        
         return LLMTestResponse(llm_response=response.content)
     except Exception as e:
-        print(f"An error occurred in /test_llm: {e}") # エラーをコンソールに出力
         raise HTTPException(status_code=500, detail=f"LLM test failed: {e}")
 
 @app.get("/graph_test")
 async def graph_test():
     """Endpoint to test the LangGraph workflow."""
     try:
-        print("Testing LangGraph workflow...")
-        initial_state = {"user_query": "foo", "sql": ""}
+        initial_state = {"user_query": "foo", "sql": "", "df": pd.DataFrame()}
         result = app_graph.invoke(initial_state)
-        print(f"LangGraph result: {result}")
+        if 'df' in result and isinstance(result['df'], pd.DataFrame):
+            result['df'] = result['df'].to_dict(orient='records')
         return result
     except Exception as e:
-        print(f"An error occurred in /graph_test: {e}")
         raise HTTPException(status_code=500, detail=f"LangGraph test failed: {e}")
 
 @app.get("/catalog")
 async def get_catalog():
-    # このエンドポイントはそのまま残すか、必要に応じて削除
     return {"message": "Catalog endpoint - not implemented for this test."}

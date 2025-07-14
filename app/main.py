@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import json
+import pandas as pd
 
 st.set_page_config(layout="wide")
 st.title("疎通確認アプリ")
@@ -19,19 +20,21 @@ if st.button("バックエンド疎通実行"):
 
             api_response = response.json()
             
-            st.subheader("バックエンドからの応答")
-            # data_jsonはJSON文字列なので、再度パースする
+            st.subheader("実行結果")
             try:
-                sql_data = json.loads(api_response.get("data_json", "{}"))
-                sql_query = sql_data.get("sql", "SQLクエリが見つかりませんでした。")
+                # バックエンドから返されたJSON文字列をDataFrameに変換
+                df_json = api_response.get("data_json", "{}")
+                df = pd.read_json(df_json, orient="split")
                 
-                st.write("生成されたSQLクエリ:")
-                st.code(sql_query, language="sql")
-                st.success("✅ バックエンド疎通確認成功！")
+                if not df.empty:
+                    st.dataframe(df)
+                    st.success("✅ SQLが実行され、データが取得されました！")
+                else:
+                    st.warning("⚠️ SQLは実行されましたが、データは返されませんでした。")
 
-            except json.JSONDecodeError:
-                st.error("バックエンドから返されたdata_jsonの形式が正しくありません。")
-                st.json(api_response) # エラーの場合は生の応答を表示
+            except Exception as e:
+                st.error(f"実行結果の表示中にエラーが発生しました: {e}")
+                st.text(api_response.get("data_json")) # エラーの場合は生のJSONを表示
 
         except requests.exceptions.ConnectionError as e:
             st.error(f"❌ バックエンドへの接続に失敗しました。FastAPI サービスが起動しているか確認してください: {e}")
