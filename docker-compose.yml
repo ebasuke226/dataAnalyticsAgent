@@ -8,6 +8,7 @@ services:
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/api/client.json
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GPT_API_KEY=${GPT_API_KEY}
     ports:
       - "8000:8000"
     volumes:
