@@ -20,12 +20,18 @@ if st.button("バックエンド疎通実行"):
             api_response = response.json()
             
             st.subheader("バックエンドからの応答")
-            st.json(api_response)
-
-            if api_response.get("insights") == "OK":
+            # data_jsonはJSON文字列なので、再度パースする
+            try:
+                sql_data = json.loads(api_response.get("data_json", "{}"))
+                sql_query = sql_data.get("sql", "SQLクエリが見つかりませんでした。")
+                
+                st.write("生成されたSQLクエリ:")
+                st.code(sql_query, language="sql")
                 st.success("✅ バックエンド疎通確認成功！")
-            else:
-                st.warning("⚠️ 応答は受け取りましたが、'OK'ではありませんでした。")
+
+            except json.JSONDecodeError:
+                st.error("バックエンドから返されたdata_jsonの形式が正しくありません。")
+                st.json(api_response) # エラーの場合は生の応答を表示
 
         except requests.exceptions.ConnectionError as e:
             st.error(f"❌ バックエンドへの接続に失敗しました。FastAPI サービスが起動しているか確認してください: {e}")

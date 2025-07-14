@@ -11,6 +11,5 @@ langchain-text-splitters
 langgraph
 langgraph-checkpoint
 langgraph-sdk
-langchain-google-genai
+langchain-openai
 pydantic
-google-generativeai
