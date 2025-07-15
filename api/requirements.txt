@@ -13,3 +13,4 @@ langgraph-checkpoint
 langgraph-sdk
 langchain-openai
 pydantic
+tabulate
