@@ -14,3 +14,5 @@ langgraph-sdk
 langchain-openai
 pydantic
 tabulate
+crewai
+crewai
