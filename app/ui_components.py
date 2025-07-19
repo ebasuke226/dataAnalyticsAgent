@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 import pandas as pd
 import json
 import api_client
@@ -7,7 +8,7 @@ def backend_communication_section():
     st.subheader("1. データ自動分析")
     user_query = st.text_area("テストクエリを入力してください:", height=100, key="backend_query")
 
-    if st.button("分析実行実行"):
+    if st.button("分析実行"):
         if user_query:
             st.info("バックエンドにリクエストを送信中...")
             try:

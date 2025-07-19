@@ -1,6 +1,8 @@
 import json
 from langgraph.graph import StateGraph, END
+from .db import fetch_data
 from .models import AgentState
+from .llm import get_llm
 from .crew import create_sql_generation_crew
 
 def node_generate_sql(state: AgentState):
@@ -22,7 +24,8 @@ def node_generate_sql(state: AgentState):
     final_sql = sql_crew.kickoff()
 
     # CrewAIの出力からSQLを抽出
-    cleaned_sql = final_sql.strip().removeprefix("```sql").removesuffix("```").strip()
+    # The output of kickoff() is a CrewOutput object, we need to access its .raw attribute
+    cleaned_sql = final_sql.raw.strip().removeprefix("```sql").removesuffix("```").strip()
     
     print(f"CrewAI Generated SQL: {cleaned_sql}")
     

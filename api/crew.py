@@ -6,7 +6,7 @@ llm = get_llm()
 # エージェントの定義
 sql_developer_agent = Agent(
     role='シニアSQLデベロッパー',
-    goal='ユーザーの要求と提供されたスキーマ情報に基づいて、効率的で正確なSQLクエリを作成する。',
+    goal='ユーザーの要求と提供されたスキーマ情報に基づいて、SQLiteで動作する効率的で正確なSQLクエリを作成する。',
     backstory='あなたはデータベース設計とクエリ最適化に20年の経験を持つ専門家です。特に複雑なJOINやサブクエリの構築に長けています。',
     llm=llm,
     allow_delegation=False,
@@ -26,7 +26,7 @@ sql_reviewer_agent = Agent(
 def create_sql_generation_crew(user_query: str, schema: str) -> Crew:
     """ユーザーの要求とスキーマに基づいてSQL生成クルーを作成する"""
     create_sql_task = Task(
-        description=f"""ユーザーの要求とデータベーススキーマに基づいて、最適なSQLクエリを作成してください。
+        description=f"""ユーザーの要求とデータベーススキーマに基づいて、SQLiteで動作する最適なSQLクエリを作成してください。
 
         ### ユーザーの要求:
         {user_query}
@@ -47,5 +47,5 @@ def create_sql_generation_crew(user_query: str, schema: str) -> Crew:
     return Crew(
         agents=[sql_developer_agent, sql_reviewer_agent],
         tasks=[create_sql_task, review_sql_task],
-        verbose=2
+        verbose=True
     )
