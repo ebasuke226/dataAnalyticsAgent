@@ -1,15 +1,15 @@
 import json
 from langgraph.graph import StateGraph, END
+from .db import fetch_data
 from .models import AgentState
 from .llm import get_llm
-from .db import fetch_data
+from .crew import create_sql_generation_crew
 
 def node_generate_sql(state: AgentState):
-    """Generates SQL from the user query based on the provided schema."""
-    print("Executing node: generate_sql")
+    """Generates SQL from the user query using a CrewAI crew."""
+    print("Executing node: generate_sql_with_crew")
     user_query = state["user_query"]
 
-    # スキーマファイルを読み込む
     try:
         with open("data/odoo_schema.json", "r") as f:
             schema = json.load(f)
@@ -19,24 +19,15 @@ def node_generate_sql(state: AgentState):
 
     schema_str = json.dumps(schema, indent=2, ensure_ascii=False)
 
-    # LLMを呼び出してSQLを生成
-    llm = get_llm()
-    prompt = f"""以下のデータベーススキーマ情報を参考にして、ユーザーの要求を満たすSQLクエリを生成してください。
-SQLクエリのみを返し、他の説明やテキストは一切含めないでください。
+    # CrewAIをセットアップして実行
+    sql_crew = create_sql_generation_crew(user_query, schema_str)
+    final_sql = sql_crew.kickoff()
 
-## データベーススキーマ
-{schema_str}
-
-## ユーザーの要求
-{user_query}
-"""
-## SQLクエリ
-
-    response = llm.invoke(prompt)
-    raw_sql = response.content
-    cleaned_sql = raw_sql.strip().removeprefix("```sql").removesuffix("```").strip()
+    # CrewAIの出力からSQLを抽出
+    # The output of kickoff() is a CrewOutput object, we need to access its .raw attribute
+    cleaned_sql = final_sql.raw.strip().removeprefix("```sql").removesuffix("```").strip()
     
-    print(f"Generated SQL: {cleaned_sql}")
+    print(f"CrewAI Generated SQL: {cleaned_sql}")
     
     state["sql"] = cleaned_sql
     return state
